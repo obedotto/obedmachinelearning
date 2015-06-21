@@ -1,0 +1,89 @@
+---
+title: "Machine Learning Project"
+author: "Obed Otto C."
+date: "21 June 2015"
+output: html_document
+---
+The objective of the project is to predict, How well a person is doing barbell lifts. As given in the assignment question output(classe variable) needs to be predicted using accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+```{r, echo=TRUE,message=FALSE}
+set.seed(4234);
+```
+The required packages are loaded as follows.
+```{r, echo=TRUE,message=FALSE}
+library(caret);
+library(kernlab);
+library(ggplot2);
+library(rattle);
+library(rpart);
+library(gbm);
+```
+
+Given training and test sets are loaded as follows
+
+```{r, echo=TRUE,message=FALSE}
+testing<-read.csv("pml-testing.csv");
+training<-read.csv("pml-training.csv");
+```
+
+Required predictor variables are stored as given below.
+
+```{r}
+reqvar_train<-c("user_name","accel_belt_x","accel_belt_y","accel_belt_z","accel_arm_x","accel_arm_y","accel_arm_z","accel_dumbbell_x","accel_dumbbell_y","accel_dumbbell_z","accel_forearm_x","accel_forearm_y","accel_forearm_z","classe");
+
+reqvar_test<-c("user_name","accel_belt_x","accel_belt_y","accel_belt_z","accel_arm_x","accel_arm_y","accel_arm_z","accel_dumbbell_x","accel_dumbbell_y","accel_dumbbell_z","accel_forearm_x","accel_forearm_y","accel_forearm_z");
+```
+
+New training and test sets are formed based on the predictors. All the unwanted variables are removed from the training and testing data.
+
+```{r, echo=TRUE,message=FALSE}
+training1<-training[,reqvar_train];
+testing1<-testing[,reqvar_test];
+```
+Near zero values need to be removed before training. Identification of near zero values are done as follows.
+```{r, echo=TRUE,message=FALSE}
+nsv<-nearZeroVar(training1,saveMetrics=TRUE);
+print(nsv)
+```
+In the above table,in nzv column all the records are having FALSE. Which means there is no near zero values. If any of the value is true, the corresponding variable needs to be removed.
+
+Since our aim is to predict, How well a person is doing barbell lifts, I have separated each person's training data separately and one model is created for each person. When new data comes, output will be predicted using the corresponding person's model.
+
+The separation of individual person's(Example user name:"eurico" ) training data is done as follows and also user_name is not used for training
+
+```{r, echo=TRUE,message=FALSE}
+dataeurico1<-subset(training1,user_name=="eurico")
+dataeurico<-dataeurico1[,-1];
+inTraineurico<-createDataPartition(y=dataeurico$classe,p=0.7,list=FALSE);
+trainingeurico<-dataeurico[inTraineurico,];
+testingeurico<-dataeurico[-inTraineurico,];
+```
+
+Feature plot for few of the parameters are as follows
+```{r, echo=TRUE,message=FALSE}
+featurePlot(x=trainingeurico[,c("accel_belt_x","accel_arm_x","accel_dumbbell_x","accel_forearm_x")],y=trainingeurico$classe)
+```
+
+K fold cross validation with K=8 is used
+```{r, echo=TRUE,message=FALSE}
+fitControl <- trainControl(method = "repeatedcv",number = 10,repeats = 10)
+
+```
+
+PreProcess method center-scale is used. Models are created using rpart and gbm, but gbm is found to be the best model with high accuracy.
+
+```{r, echo=TRUE,message=FALSE}
+fitControl <- trainControl(method = "repeatedcv",number = 8,repeats = 8)
+
+modelFiteurico<-train(classe~.,data=trainingeurico,preProcess=c("center","scale"),trControl = fitControl,method="gbm",verbose=FALSE);
+outeurico<-predict(modelFiteurico,newdata=testingeurico);
+confusionMatrix(testingeurico$classe,outeurico)
+```
+
+As shown above, the model is created with high accuracy for one person. Similarly the one model for each 6 persons is created. When new data comes, the output is predicted using the corresponding model.
+
+prediction for the person "eurico" data in training set is done below
+```{r, echo=TRUE,message=FALSE}
+classeeurico<-predict(modelFiteurico,testing1[16,]);
+print(classeeurico)
+```
+
